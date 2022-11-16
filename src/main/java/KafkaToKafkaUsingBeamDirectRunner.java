@@ -56,8 +56,8 @@ public class KafkaToKafkaUsingBeamDirectRunner {
 //
 //        // For cloud execution, set the Google Cloud project, staging location,
 //        // and set DataflowRunner.
-//        option.setProject("dmn01-rskcda-bld-01-997c");
-//        option.setStagingLocation("gs://dmn01-rskcda-bld-01-stb-euwe2-csp-example");
+//        option.setProject("");
+//        option.setStagingLocation("");
 //        option.setRunner(DataflowRunner.class);
 //        Options options = option.as(Options.class);
         Options options = PipelineOptionsFactory.fromArgs(args)
