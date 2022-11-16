@@ -1,0 +1,8 @@
+japan: This is event 1
+india: This is event 2
+china: This is event 3
+america: This is event 4
+india: This is event 1
+india: This is event 2
+russia: This is event 3
+france: This is event 4
