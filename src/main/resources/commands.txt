@@ -1,0 +1,35 @@
+//Contains commands that can be used on local kafka
+
+start services =
+cd kafka_2.13-3.0.0
+bin/zookeeper-server-start.sh config/zookeeper.properties
+
+cd kafka_2.13-3.0.0
+bin/kafka-server-start.sh config/server.properties
+
+create topic =
+bin/kafka-topics.sh --create --topic test-events --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
+
+list topics =
+bin/kafka-topics.sh --list --bootstrap-server localhost:9092
+
+describe topic =
+bin/kafka-topics.sh --describe --topic test-events --bootstrap-server localhost:9092
+
+console producer =
+cd kafka_2.13-3.0.0
+bin/kafka-console-producer.sh --topic test-events --bootstrap-server localhost:9092 < data.txt
+cd kafka_2.13-3.0.0
+bin/kafka-console-producer.sh --topic test-events --bootstrap-server localhost:9092 < jsondata.txt
+
+console consumer =
+cd kafka_2.13-3.0.0
+bin/kafka-console-consumer.sh --topic test-events --from-beginning --bootstrap-server localhost:9092
+
+console consumer 2 =
+cd kafka_2.13-3.0.0
+bin/kafka-console-consumer.sh --topic test-events-output --from-beginning --bootstrap-server localhost:9092
+
+
+fixing shutdown issue =
+rm -rf /home/dbda/kafka-logs /tmp/zookeeper
