@@ -1,7 +1,7 @@
 package pipeline;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import com.google.gson.*;
+import model.CreditFacilityLimit;
 import options.ConsumerPipelineOptions;
 import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
@@ -13,7 +13,7 @@ import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PCollection;
 import org.apache.beam.sdk.values.TypeDescriptor;
 import org.joda.time.Duration;
-
+import functions.JSONToCFLParser;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.UUID;
@@ -22,6 +22,7 @@ public class SinkToKafkaTransformationPipeline extends KafkaToSinkIngestionPipel
 
     private static final Gson GSON = new GsonBuilder()
             .setDateFormat("yyyy-MM-dd")
+            .serializeNulls()
             .create();
 
 
@@ -82,5 +83,35 @@ public class SinkToKafkaTransformationPipeline extends KafkaToSinkIngestionPipel
                                         ConsumerPipelineOptions options) {
         UUID uuid = UUID.randomUUID();
 
+
+        LOGGER.info("{} - Transforming Pipeline with message {}", uuid, kafkaMessages);
+
+        PCollection<String> jsonMessage = kafkaMessages.apply("Get message contents", Values.<String>create());
+
+        jsonMessage.apply("Log messages", MapElements.into(TypeDescriptor.of(String.class))
+                .via(message -> {
+                    LOGGER.info("Received: {}", message);
+                    return message;
+                }));
+
+        PCollection<CreditFacilityLimit> creditFacilityLimit = jsonMessage.apply(ParDo.of(new JSONToCFLParser()));
+
+//        PCollection<CreditFacilityLimit> creditFacilityLimit = jsonMessage.apply("Parse JSON",
+//                MapElements.into(TypeDescriptor.of(CreditFacilityLimit.class))
+//                        .via(message -> GSON.fromJson(message, CreditFacilityLimit.class)));
+
+
+        LOGGER.info("##########Log CFL message#############");
+
+//        creditFacilityLimit.apply(ParDo.of(new CFLToJSONParser()));
+
+        LOGGER.info("##########End of Pipeline#############");
+//        creditFacilityLimit.apply("Log CFL Messages", MapElements.into(TypeDescriptor.of(CreditFacilityLimit.class))
+//                .via(jsonRecord -> {
+//                    LOGGER.info("Received After parsing: {}", jsonRecord);
+//                    return jsonRecord;
+//                }));
+
     }
+
 }

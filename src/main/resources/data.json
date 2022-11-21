@@ -1,0 +1,33 @@
+{
+  "data": {
+    "schema": "DQ2pwheBjfshbbjfsjh979",
+    "payload": {
+      "Customer_ID": "007896955",
+      "CRAG_ID": "656",
+      "ORG_ID": "7779",
+      "CreditProposalID": "2441",
+      "FacilityID": "66154776",
+      "FacilityLendingType": "Hard",
+      "FacilityProductType": "Non-Traded",
+      "ProductCategory": "Contingent",
+      "ProductGroup": "Municipal L/C",
+      "ProductSubType": "Municipal L/C",
+      "SourceSystem": "NCINO",
+      "Currency": "GBP",
+      "GrossAmt": "4993.47",
+      "NetAmt": "560.39",
+      "GrossAmtGBP": "7369.57",
+      "NetAmtGBP": "203.58",
+      "StartDate": "2016-04-02",
+      "MaturityDate": "2022-01-30",
+      "BankEntity": "28799593",
+      "Status": "7",
+      "LastModifiedDate": "2018-05-16 04:32:44",
+      "LastModifiedByID": "944"
+    },
+    "event": {
+      "replayId": "09566"
+    }
+  },
+  "channel": "/data/Account_FacilityCredit_ChangeEvent"
+}
