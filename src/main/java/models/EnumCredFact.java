@@ -1,4 +1,4 @@
-package model;
+package models;
 
 public enum EnumCredFact {
     Customer_ID,

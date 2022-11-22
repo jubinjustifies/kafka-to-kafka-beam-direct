@@ -1,7 +1,7 @@
 package pipeline;
 
-import model.CreditFacilityLimit;
-import model.ErrorInfo;
+import models.CreditFacilityLimit;
+import models.ErrorInfo;
 import options.ConsumerPipelineOptions;
 import org.apache.beam.repackaged.core.org.apache.commons.lang3.ObjectUtils;
 import org.apache.beam.sdk.Pipeline;
@@ -18,9 +18,9 @@ import coders.FailsafeElementCoder;
 import java.io.IOException;
 import java.util.Map;
 
-public abstract class KafkaToSinkIngestionPipeline {
+public abstract class IngestionPipeline {
 
-    public static final Logger LOGGER = LoggerFactory.getLogger(KafkaToSinkIngestionPipeline.class);
+    public static final Logger LOGGER = LoggerFactory.getLogger(IngestionPipeline.class);
 
     /**
      * This is the definition of the basicTransform which would be implemented by pipeline extending this Class.
@@ -38,7 +38,7 @@ public abstract class KafkaToSinkIngestionPipeline {
      * @param kafkaMessages The kafka messages in key-value form.
      * @param options       The options for running the pipeline.
      */
-    public abstract void initiateTransformations(PCollection<KV<String, String>> kafkaMessages,
+    public abstract PCollection<KV<String, String>> initiateTransformations(PCollection<KV<String, String>> kafkaMessages,
                                                  ConsumerPipelineOptions options);
 
     /**
@@ -65,7 +65,7 @@ public abstract class KafkaToSinkIngestionPipeline {
 //
 //        publishKafkaMessages(transformedKafkaMessages, options);
 
-        initiateTransformations(kafkaMessages, options);
+        writeKafkaMessages(initiateTransformations(kafkaMessages, options),options);
 
         return pipeline.run();
     }
@@ -111,8 +111,8 @@ public abstract class KafkaToSinkIngestionPipeline {
      * @param kafkaMessages The pipeline Object Passed
      * @param options  The custom Pipeline options passed.
      */
-    public void publishKafkaMessages(PCollection<KV<String, String>> kafkaMessages, ConsumerPipelineOptions options){
-        kafkaMessages.apply("PublishToKafka",
+    public void writeKafkaMessages(PCollection<KV<String, String>> kafkaMessages, ConsumerPipelineOptions options){
+        kafkaMessages.apply("WriteToKafka",
                 KafkaIO.<String, String> write()
                         .withBootstrapServers(
                                 options.getKafkaServer())

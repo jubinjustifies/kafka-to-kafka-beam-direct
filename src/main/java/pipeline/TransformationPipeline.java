@@ -1,7 +1,7 @@
 package pipeline;
 
-import com.google.gson.*;
-import model.CreditFacilityLimit;
+import transforms.JSONParser;
+import models.CreditFacilityLimit;
 import options.ConsumerPipelineOptions;
 import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
@@ -13,17 +13,17 @@ import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PCollection;
 import org.apache.beam.sdk.values.TypeDescriptor;
 import org.joda.time.Duration;
-import functions.JSONToCFLParser;
+import transforms.CFLParser;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.UUID;
 
-public class SinkToKafkaTransformationPipeline extends KafkaToSinkIngestionPipeline implements Serializable {
+public class TransformationPipeline extends IngestionPipeline implements Serializable {
 
-    private static final Gson GSON = new GsonBuilder()
-            .setDateFormat("yyyy-MM-dd")
-            .serializeNulls()
-            .create();
+//    private static final Gson GSON = new GsonBuilder()
+//            .setDateFormat("yyyy-MM-dd")
+//            .serializeNulls()
+//            .create();
 
 
     public static void main(String[] args) throws IOException {
@@ -32,7 +32,7 @@ public class SinkToKafkaTransformationPipeline extends KafkaToSinkIngestionPipel
                 PipelineOptionsFactory.fromArgs(args).withValidation()
                         .as(ConsumerPipelineOptions.class);
 
-        SinkToKafkaTransformationPipeline pipeline = new SinkToKafkaTransformationPipeline();
+        TransformationPipeline pipeline = new TransformationPipeline();
         PipelineResult run = pipeline.run(options);
         run.waitUntilFinish(Duration.standardSeconds(options.getDuration()));
     }
@@ -79,7 +79,7 @@ public class SinkToKafkaTransformationPipeline extends KafkaToSinkIngestionPipel
     }
 
     @Override
-    public void initiateTransformations(PCollection<KV<String, String>> kafkaMessages,
+    public PCollection<KV<String, String>> initiateTransformations(PCollection<KV<String, String>> kafkaMessages,
                                         ConsumerPipelineOptions options) {
         UUID uuid = UUID.randomUUID();
 
@@ -94,7 +94,7 @@ public class SinkToKafkaTransformationPipeline extends KafkaToSinkIngestionPipel
                     return message;
                 }));
 
-        PCollection<CreditFacilityLimit> creditFacilityLimit = jsonMessage.apply(ParDo.of(new JSONToCFLParser()));
+        PCollection<CreditFacilityLimit> creditFacilityLimit = jsonMessage.apply(ParDo.of(new CFLParser()));
 
 //        PCollection<CreditFacilityLimit> creditFacilityLimit = jsonMessage.apply("Parse JSON",
 //                MapElements.into(TypeDescriptor.of(CreditFacilityLimit.class))
@@ -103,9 +103,8 @@ public class SinkToKafkaTransformationPipeline extends KafkaToSinkIngestionPipel
 
         LOGGER.info("##########Log CFL message#############");
 
-//        creditFacilityLimit.apply(ParDo.of(new CFLToJSONParser()));
+        return creditFacilityLimit.apply(ParDo.of(new JSONParser()));
 
-        LOGGER.info("##########End of Pipeline#############");
 //        creditFacilityLimit.apply("Log CFL Messages", MapElements.into(TypeDescriptor.of(CreditFacilityLimit.class))
 //                .via(jsonRecord -> {
 //                    LOGGER.info("Received After parsing: {}", jsonRecord);
