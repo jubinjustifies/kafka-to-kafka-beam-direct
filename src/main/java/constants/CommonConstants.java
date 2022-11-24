@@ -1,4 +1,4 @@
-package constant;
+package constants;
 
 /**
  *Class Containing various constants used

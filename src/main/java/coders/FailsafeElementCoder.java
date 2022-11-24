@@ -1,6 +1,6 @@
 package coders;
 
-import util.FailsafeElement;
+import utils.FailsafeElement;
 import org.apache.beam.sdk.coders.*;
 import org.apache.beam.sdk.values.TypeDescriptor;
 import org.apache.beam.sdk.values.TypeParameter;

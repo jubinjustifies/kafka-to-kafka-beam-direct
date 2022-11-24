@@ -12,17 +12,23 @@ public interface ConsumerPipelineOptions extends PipelineOptions{
 
     void setKafkaServer(String value);
 
-    @Description("Kafka Topic Name")
-    @Default.String("test-events")
+    @Description("Kafka Input Topic Name")
+    @Default.String("input-events")
     String getInputTopic();
 
     void setInputTopic(String value);
 
-    @Description("Kafka Output Topic Name")
-    @Default.String("test-events-output")
-    String getOutputTopic();
+    @Description("Kafka Valid Output Topic Name")
+    @Default.String("output-events")
+    String getValidOutputTopic();
 
-    void setOutputTopic(String value);
+    void setValidOutputTopic(String value);
+
+    @Description("Kafka Invalid Output Topic Name")
+    @Default.String("error-events")
+    String getInvalidOutputTopic();
+
+    void setInvalidOutputTopic(String value);
 
     @Description("Read Start Time")
     String getReadStartTime();

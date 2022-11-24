@@ -1,5 +1,7 @@
-package pipeline;
+package pipelines;
 
+import exceptions.Failure;
+import exceptions.KafkaIOException;
 import models.CreditFacilityLimit;
 import models.ErrorInfo;
 import options.ConsumerPipelineOptions;
@@ -8,6 +10,7 @@ import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.coders.*;
 import org.apache.beam.sdk.io.kafka.KafkaIO;
+import org.apache.beam.sdk.transforms.ToString;
 import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PCollection;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -15,6 +18,7 @@ import org.joda.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import coders.FailsafeElementCoder;
+import pardos.ReadFromKafka;
 import java.io.IOException;
 import java.util.Map;
 
@@ -62,10 +66,10 @@ public abstract class IngestionPipeline {
         LOGGER.info("Received kafka message, initiating transformations");
 
 //        PCollection<KV<String, String>> transformedKafkaMessages = basicTransformation(kafkaMessages, options);
-//
-//        publishKafkaMessages(transformedKafkaMessages, options);
 
-        writeKafkaMessages(initiateTransformations(kafkaMessages, options),options);
+        PCollection<KV<String, String>> transformedCollection = initiateTransformations(kafkaMessages, options);
+
+        writeValidKafkaMessages(transformedCollection, options);
 
         return pipeline.run();
     }
@@ -78,49 +82,71 @@ public abstract class IngestionPipeline {
      * @return PCollection of key-value Kafka messages
      */
     public PCollection<KV<String, String>> readKafkaMessages(Pipeline pipeline,
-                                                             ConsumerPipelineOptions options) throws IOException {
+                                                             ConsumerPipelineOptions options) {
 
-        if (ObjectUtils.isEmpty(options.getReadStartTime())) {
-            return pipeline.apply(
-                    "ReadFromKafka",
-                    KafkaIO.<String, String> read()
-                            .withKeyDeserializer(StringDeserializer.class)
-                            .withValueDeserializer(StringDeserializer.class)
-                            .withBootstrapServers(options.getKafkaServer())
-                            .withTopic(options.getInputTopic())
-                            .withoutMetadata()
-            );
+        if(options.getInputTopic() != null) {
+            if (ObjectUtils.isEmpty(options.getReadStartTime())) {
+                return pipeline.apply(
+                        "ReadFromKafka",
+                        KafkaIO.<String, String>read()
+                                .withKeyDeserializer(StringDeserializer.class)
+                                .withValueDeserializer(StringDeserializer.class)
+                                .withBootstrapServers(options.getKafkaServer())
+                                .withTopic(options.getInputTopic())
+                                .withoutMetadata()
+                );
+            } else {
+                Instant startReadTime = Instant.parse(options.getReadStartTime());
+                return pipeline.apply(
+                        "ReadFromKafkaWithStartReadTime",
+                        KafkaIO.<String, String>read()
+                                .withKeyDeserializer(StringDeserializer.class)
+                                .withValueDeserializer(StringDeserializer.class)
+                                .withBootstrapServers(options.getKafkaServer())
+                                .withTopic(options.getInputTopic())
+                                .withStartReadTime(startReadTime)
+                                .withoutMetadata()
+                );
+            }
         } else {
-            Instant startReadTime = Instant.parse(options.getReadStartTime());
-            return pipeline.apply(
-                    "ReadFromKafka",
-                    KafkaIO.<String, String> read()
-                            .withKeyDeserializer(StringDeserializer.class)
-                            .withValueDeserializer(StringDeserializer.class)
-                            .withBootstrapServers(options.getKafkaServer())
-                            .withTopic(options.getInputTopic())
-                            .withStartReadTime(startReadTime)
-                            .withoutMetadata()
-            );
+            throw new KafkaIOException("Input Topic is not configured.");
         }
     }
 
     /**
-     * This method is used to publish kafka messages using the Pipeline options defined.
+     * This method is used to publish valid data to kafka using the Pipeline options defined.
      *
-     * @param kafkaMessages The pipeline Object Passed
+     * @param validCollection The pipeline Object Passed
      * @param options  The custom Pipeline options passed.
      */
-    public void writeKafkaMessages(PCollection<KV<String, String>> kafkaMessages, ConsumerPipelineOptions options){
-        kafkaMessages.apply("WriteToKafka",
+    public void writeValidKafkaMessages(PCollection<KV<String, String>> validCollection, ConsumerPipelineOptions options){
+        validCollection.apply("WriteValidToKafka",
                 KafkaIO.<String, String> write()
                         .withBootstrapServers(
                                 options.getKafkaServer())
-                        .withTopic(options.getOutputTopic())
+                        .withTopic(options.getValidOutputTopic())
                         .withKeySerializer(
                                 org.apache.kafka.common.serialization.StringSerializer.class)
                         .withValueSerializer(
                                 org.apache.kafka.common.serialization.StringSerializer.class));
+    }
+
+    /**
+     * This method is used to publish failed data to kafka using the Pipeline options defined.
+     *
+     * @param failedCollection The pipeline Object Passed
+     * @param options  The custom Pipeline options passed.
+     */
+    public void writeInvalidKafkaMessages(PCollection<Failure> failedCollection, ConsumerPipelineOptions options){
+        failedCollection.apply(ToString.elements()).apply("WriteInvalidToKafka",
+                KafkaIO.<String, String> write()
+                        .withBootstrapServers(
+                                options.getKafkaServer())
+                        .withTopic(options.getInvalidOutputTopic())
+                        .withKeySerializer(
+                                org.apache.kafka.common.serialization.StringSerializer.class)
+                        .withValueSerializer(
+                                org.apache.kafka.common.serialization.StringSerializer.class).values());
     }
 
 
@@ -156,5 +182,23 @@ public abstract class IngestionPipeline {
         coderRegistry.registerCoderForType(error_builder_coder.getEncodedTypeDescriptor(),
                 error_builder_coder);
 
+    }
+
+
+
+
+    /**
+     * This method is used to read kafka messages using the Pipeline options defined.
+     *
+     * @param pipeline The pipeline Object Passed
+     * @param options  The custom Pipeline options passed.
+     * @return PCollection of key-value Kafka messages
+     */
+    public PCollection<KV<String, String>> readKafkaMessagesNew(Pipeline pipeline,
+                                                             ConsumerPipelineOptions options) throws IOException {
+
+        ReadFromKafka readFromKafka = new ReadFromKafka();
+//        return pipeline.apply(ParDo.of(readFromKafka).withOutputTags(readFromKafka.getOutputTag(), TupleTagList.of(readFromKafka.getFailuresTag())));
+        return null;
     }
 }

@@ -1,6 +1,8 @@
-package pipeline;
+package pipelines;
 
-import transforms.JSONParser;
+import exceptions.Failure;
+import org.apache.beam.sdk.values.*;
+import pardos.CFLToJSONParser;
 import models.CreditFacilityLimit;
 import options.ConsumerPipelineOptions;
 import org.apache.beam.sdk.PipelineResult;
@@ -9,22 +11,13 @@ import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.MapElements;
 import org.apache.beam.sdk.transforms.ParDo;
 import org.apache.beam.sdk.transforms.Values;
-import org.apache.beam.sdk.values.KV;
-import org.apache.beam.sdk.values.PCollection;
-import org.apache.beam.sdk.values.TypeDescriptor;
 import org.joda.time.Duration;
-import transforms.CFLParser;
+import pardos.JSONToCFLParser;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.UUID;
 
 public class TransformationPipeline extends IngestionPipeline implements Serializable {
-
-//    private static final Gson GSON = new GsonBuilder()
-//            .setDateFormat("yyyy-MM-dd")
-//            .serializeNulls()
-//            .create();
-
 
     public static void main(String[] args) throws IOException {
 
@@ -42,7 +35,7 @@ public class TransformationPipeline extends IngestionPipeline implements Seriali
     public PCollection<KV<String, String>> basicTransformation(PCollection<KV<String, String>> kafkaMessages, ConsumerPipelineOptions options) {
 
         PCollection<String> payload = kafkaMessages.apply("ExtractPayload",
-                        Values.<String> create())
+                        Values.<String>create())
                 .apply(ParDo.of(new DoFn<String, String>() {
                     @ProcessElement
                     public void processElement(ProcessContext c) {
@@ -58,7 +51,7 @@ public class TransformationPipeline extends IngestionPipeline implements Seriali
                 ParDo.of(new DoFn<String, String>() {
                     @ProcessElement
                     public void processElement(ProcessContext c) {
-                        if (c.element().contains(country)){
+                        if (c.element().contains(country)) {
                             c.output(c.element());
                         }
 
@@ -78,39 +71,49 @@ public class TransformationPipeline extends IngestionPipeline implements Seriali
         return eventsInIndiaKV;
     }
 
+
     @Override
     public PCollection<KV<String, String>> initiateTransformations(PCollection<KV<String, String>> kafkaMessages,
                                         ConsumerPipelineOptions options) {
         UUID uuid = UUID.randomUUID();
 
-
         LOGGER.info("{} - Transforming Pipeline with message {}", uuid, kafkaMessages);
 
-        PCollection<String> jsonMessage = kafkaMessages.apply("Get message contents", Values.<String>create());
+        final PCollection<String> jsonMessage = kafkaMessages.apply(Values.<String>create());
 
-        jsonMessage.apply("Log messages", MapElements.into(TypeDescriptor.of(String.class))
+        jsonMessage.apply("LogIngestedMessages", MapElements.into(TypeDescriptor.of(String.class))
                 .via(message -> {
-                    LOGGER.info("Received: {}", message);
+                    LOGGER.info("Ingested Messages: {}", message);
                     return message;
                 }));
 
-        PCollection<CreditFacilityLimit> creditFacilityLimit = jsonMessage.apply(ParDo.of(new CFLParser()));
+        LOGGER.info("Parsing JSON to CFL");
+        JSONToCFLParser jsonToCFLParser = new JSONToCFLParser();
+        final PCollectionTuple readStageTuple = jsonMessage
+                .apply(ParDo.of(jsonToCFLParser)
+                        .withOutputTags(jsonToCFLParser.getOutputTag(), TupleTagList.of(jsonToCFLParser.getFailuresTag())));
 
-//        PCollection<CreditFacilityLimit> creditFacilityLimit = jsonMessage.apply("Parse JSON",
-//                MapElements.into(TypeDescriptor.of(CreditFacilityLimit.class))
-//                        .via(message -> GSON.fromJson(message, CreditFacilityLimit.class)));
+        PCollection<CreditFacilityLimit> creditFacilityLimit = readStageTuple.get(jsonToCFLParser.getOutputTag());
+        PCollection<Failure> creditFacilityLimitFailure = readStageTuple.get(jsonToCFLParser.getFailuresTag());
+        writeInvalidKafkaMessages(creditFacilityLimitFailure, options);
 
+        LOGGER.info("Parsing CFL to JSON");
+        CFLToJSONParser cflToJSONParser = new CFLToJSONParser();
+        final PCollectionTuple writeStageTuple = creditFacilityLimit
+                .apply(ParDo.of(cflToJSONParser)
+                        .withOutputTags(cflToJSONParser.getOutputTag(), TupleTagList.of(cflToJSONParser.getFailuresTag())));
 
-        LOGGER.info("##########Log CFL message#############");
+        PCollection<KV<String, String>> creditFacilityLimit2 = writeStageTuple.get(cflToJSONParser.getOutputTag());
+        PCollection<Failure> creditFacilityLimitFailure2 = writeStageTuple.get(cflToJSONParser.getFailuresTag());
+        writeInvalidKafkaMessages(creditFacilityLimitFailure2, options);
 
-        return creditFacilityLimit.apply(ParDo.of(new JSONParser()));
+        creditFacilityLimit2.apply(Values.<String>create())
+                .apply("LogParsedMessages", MapElements.into(TypeDescriptor.of(String.class))
+                        .via(jsonRecord -> {
+                            LOGGER.info("Parsed Messages: {}", jsonRecord);
+                            return jsonRecord;
+                }));
 
-//        creditFacilityLimit.apply("Log CFL Messages", MapElements.into(TypeDescriptor.of(CreditFacilityLimit.class))
-//                .via(jsonRecord -> {
-//                    LOGGER.info("Received After parsing: {}", jsonRecord);
-//                    return jsonRecord;
-//                }));
-
+        return creditFacilityLimit2;
     }
-
 }
