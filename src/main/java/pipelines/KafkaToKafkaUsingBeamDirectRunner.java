@@ -1,4 +1,4 @@
-package pipeline;
+package pipelines;
 
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.PipelineResult;
