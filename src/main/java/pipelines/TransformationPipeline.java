@@ -32,6 +32,20 @@ public class TransformationPipeline extends IngestionPipeline implements Seriali
 
 
     @Override
+    public PCollection<String> testTransformation(PCollection<KV<String, String>> kafkaMessages, ConsumerPipelineOptions options) {
+
+        PCollection<String> messages = kafkaMessages.apply("ExtractPayload", Values.<String>create());
+
+        messages.apply("LogIngestedMessages", MapElements.into(TypeDescriptor.of(String.class))
+                .via(message -> {
+                    LOGGER.info("Ingested Messages: {}", message);
+                    return message;
+                }));
+
+        return messages;
+    }
+
+    @Override
     public PCollection<KV<String, String>> basicTransformation(PCollection<KV<String, String>> kafkaMessages, ConsumerPipelineOptions options) {
 
         PCollection<String> payload = kafkaMessages.apply("ExtractPayload",
@@ -74,7 +88,7 @@ public class TransformationPipeline extends IngestionPipeline implements Seriali
 
     @Override
     public PCollection<KV<String, String>> initiateTransformations(PCollection<KV<String, String>> kafkaMessages,
-                                        ConsumerPipelineOptions options) {
+                                        ConsumerPipelineOptions options) throws IOException {
         UUID uuid = UUID.randomUUID();
 
         LOGGER.info("{} - Transforming Pipeline with message {}", uuid, kafkaMessages);
