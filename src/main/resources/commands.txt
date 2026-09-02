@@ -33,3 +33,7 @@ bin/kafka-console-consumer.sh --topic error-events --from-beginning --bootstrap-
 
 fixing shutdown issue =
 rm -rf /home/dbda/kafka-logs /tmp/zookeeper
+
+
+run arguments =
+--runner=DirectRunner --project=burner-gcp-project-id
